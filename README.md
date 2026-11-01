@@ -85,7 +85,6 @@ Las fuentes se cambian agregando o quitando nodos RSS.
 | --- | --- |
 | `resumen-novedades-ia.json` | El workflow para importar en n8n |
 | `schema.sql` | Tabla del historial |
-| `demo.mp4` | Video del flujo en ejecución |
 
 ## Tecnologías
 
