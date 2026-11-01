@@ -2,7 +2,9 @@
 
 Workflow de **n8n** que todas las mañanas lee 14 fuentes de noticias, descarta lo repetido y lo irrelevante, usa IA para clasificar lo que queda según un perfil de intereses y manda un resumen por mail.
 
-<!-- Reemplazar esta línea por el video: en el editor web de GitHub, arrastrar demo.mp4 acá -->
+
+https://github.com/user-attachments/assets/c30dde39-81d1-4a9d-844b-c05835b85f66
+
 
 ## Qué resuelve
 
