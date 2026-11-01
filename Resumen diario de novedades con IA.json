@@ -1,0 +1,1072 @@
+{
+  "name": "Resumen diario de novedades con IA",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -576,
+        736
+      ],
+      "id": "bd8720ee-624e-4a28-8207-78e3ffdb7d6f",
+      "name": "Todos los días 8 AM"
+    },
+    {
+      "parameters": {
+        "url": "https://github.com/n8n-io/n8n/releases.atom",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        1008
+      ],
+      "id": "29fbe0f1-3745-4b51-9e19-27422b1384d4",
+      "name": "n8n releases",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://openai.com/news/rss.xml",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        1664
+      ],
+      "id": "8300dc64-a289-4018-8bf8-da73018d6e10",
+      "name": "OpenAI news",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://blog.google/technology/ai/rss/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        1840
+      ],
+      "id": "09f7f978-0069-4222-a20b-e0517567a6ec",
+      "name": "Google AI blog",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://community.n8n.io/latest.rss",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        1488
+      ],
+      "id": "4a5e64f5-b397-4e08-9804-35d9f0c41413",
+      "name": "n8n foro",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://blog.n8n.io/rss/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        1312
+      ],
+      "id": "8f4bd68b-3e2c-49e3-9b98-e3c38c4e41f4",
+      "name": "n8n blog",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://github.com/anthropics/claude-code/releases.atom",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        864
+      ],
+      "id": "23b4f049-b908-4592-a026-7d74f6fb230c",
+      "name": "Claude Code releases",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "numberInputs": 7
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1328,
+        1280
+      ],
+      "id": "76245aab-62af-462d-be57-63efce91f023",
+      "name": "Unir fuentes principales"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lleva todas las fuentes a un mismo formato: fuente, título, link, fecha, resumen.\nconst HOST_A_FUENTE = {\n  'blog.n8n.io': 'n8n blog',\n  'community.n8n.io': 'n8n foro',\n  'openai.com': 'OpenAI',\n  'blog.google': 'Google AI',\n  'www.producthunt.com': 'Product Hunt',\n  'www.reddit.com': 'Reddit'\n};\n\nconst limpiarHtml = s => String(s || '')\n  .replace(/<[^>]*>/g, ' ')\n  .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')\n  .replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\")\n  .replace(/\\s+/g, ' ')\n  .trim();\n\nconst salida = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  if (j.error || !j.link || !j.title) continue;   // fuente caída o item incompleto\n\n  const link = String(j.link);\n  const host = (link.match(/^https?:\\/\\/([^\\/?#]+)/i) || [])[1]?.toLowerCase() || '';\n  let fuente = j._fuente || HOST_A_FUENTE[host] || host || 'otra';\n\n  if (!j._fuente && host === 'github.com') {\n    if (link.includes('/n8n-io/n8n/')) fuente = 'n8n releases';\n    else if (link.includes('/anthropics/claude-code/')) fuente = 'Claude Code releases';\n  }\n\n  let resumen = String(j.contentSnippet || '') || limpiarHtml(j.content || j.summary || j.description);\n  resumen = resumen\n    .replace(/submitted by\\s+\\/u\\/\\S+\\s*\\[link\\]\\s*\\[comments\\]/i, '')\n    .replace(/Discussion\\s*\\|\\s*Link/i, '')\n    .trim();\n\n  salida.push({ json: {\n    fuente,\n    titulo: j.title,\n    link,\n    carril: j._carril || 'principal',\n    fecha: j.isoDate || j.pubDate || null,\n    categoria: [].concat(j.categories || j.category || []).map(String).join(', '),\n    resumen: resumen.slice(0, 400)\n  }});\n}\nreturn salida;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        736
+      ],
+      "id": "2e47903c-8735-42a2-bb0a-3d3df75775d1",
+      "name": "Normalizar"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Descarta lo viejo, los releases que no son versiones y los títulos repetidos.\nconst cfg = $('Configuración').first().json;\nconst DIAS = Number(cfg.dias_hacia_atras) || 3;\nconst DIAS_RAPIDAS = 2;                       // foros y agregadores se renuevan rápido\nconst RAPIDAS = ['n8n foro', 'Reddit automation', 'Product Hunt', 'Hacker News'];\nconst FORO_OK = ['built with n8n', 'tips & tricks'];\n\nconst ahora = Date.now();\nconst vistos = new Set();\nconst salida = [];\n\nfor (const item of $input.all()) {\n  const j = item.json;\n  const t = Date.parse(j.fecha);\n  if (isNaN(t)) continue;\n  const dias = RAPIDAS.includes(j.fuente) ? DIAS_RAPIDAS : DIAS;\n  if (t < ahora - dias * 24 * 3600 * 1000) continue;\n\n  if (j.fuente === 'n8n releases' && !String(j.titulo).startsWith('n8n@')) continue;\n  if (j.fuente === 'n8n foro' && j.categoria) {\n    const cat = j.categoria.replace(/&amp;/g, '&').toLowerCase();\n    if (!FORO_OK.some(c => cat.includes(c))) continue;\n  }\n\n  const clave = String(j.titulo).trim().toLowerCase();\n  if (vistos.has(clave)) continue;\n  vistos.add(clave);\n  salida.push(item);\n}\nsalida.sort((a, b) => Date.parse(b.json.fecha) - Date.parse(a.json.fecha));\nreturn salida.length ? salida : [{ json: { vacio: true } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2432,
+        736
+      ],
+      "id": "2833f681-854c-4611-bcdb-8452b4c77831",
+      "name": "Filtrar recientes y duplicados"
+    },
+    {
+      "parameters": {
+        "url": "https://www.producthunt.com/feed",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        2128
+      ],
+      "id": "107946eb-b886-4d93-9c48-df2ed2f40b57",
+      "name": "Product Hunt",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Puntúa cada noticia con reglas simples ANTES de llamar a la IA:\n// así el modelo recibe una lista corta y el costo por ejecución queda bajo.\nconst cfg = $('Configuración').first().json;\n\nconst MAX_POR_FUENTE = { 'n8n releases': 2, 'Claude Code releases': 2, 'OpenAI': 4, 'n8n blog': 3, 'Google AI': 2, 'n8n foro': 6, 'Product Hunt': 3 };\nconst TOTAL_PRINCIPAL = 12;\nconst MAX_POR_FUENTE_EXTRA = { 'Simon Willison': 2, 'Hacker News': 3, 'Hugging Face': 2, 'MIT Tech Review': 2, 'Quanta': 1, 'The Verge AI': 2, 'Reddit automation': 2 };\nconst TOTAL_EXTRA = 8;\n\nconst aRegex = lista => {\n  const palabras = String(lista || '').split(',').map(p => p.trim()).filter(Boolean)\n    .map(p => p.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'));\n  return palabras.length ? new RegExp(palabras.join('|'), 'i') : null;\n};\nconst SUMAN = aRegex(cfg.palabras_que_suman);\nconst RESTAN = aRegex(cfg.palabras_que_restan);\nconst SPAM = /disclosure|i['’]?m the founder|we run a|for hire|beta testers|free templates|looking for|need help/i;\nconst CAMBIOS = /deprecat|pricing|shut ?down|sunset|breaking/i;\n\nfunction puntaje(j) {\n  const t = `${j.titulo} ${j.resumen}`;\n  let p = 0;\n  if (SUMAN && SUMAN.test(t)) p += 2;\n  if (CAMBIOS.test(t)) p += 3;\n  if (RESTAN && RESTAN.test(t)) p -= 5;\n  if (SPAM.test(t)) p -= 4;\n  return p;\n}\n\nconst porFecha = (a, b) => Date.parse(b.fecha) - Date.parse(a.fecha);\nconst orden = (a, b) => b.p - a.p || porFecha(a, b);\n\nconst principal = {}, extra = {};\nfor (const item of $input.all()) {\n  const j = item.json;\n  if (j.carril === 'extra') { (extra[j.fuente] = extra[j.fuente] || []).push(j); continue; }\n  const p = puntaje(j);\n  if (p < 0) continue;\n  (principal[j.fuente] = principal[j.fuente] || []).push({ ...j, p });\n}\n\nlet lista = [];\nfor (const f of Object.keys(principal)) {\n  principal[f].sort(orden);\n  lista.push(...principal[f].slice(0, MAX_POR_FUENTE[f] ?? 3));\n}\nlista = lista.sort(orden).slice(0, TOTAL_PRINCIPAL);\n\nlet ampliar = [];\nfor (const f of Object.keys(extra)) {\n  extra[f].sort(porFecha);\n  ampliar.push(...extra[f].slice(0, MAX_POR_FUENTE_EXTRA[f] ?? 2));\n}\nampliar = ampliar.sort(porFecha).slice(0, TOTAL_EXTRA).map(j => ({ ...j, p: 0 }));\n\nconst todo = [...lista, ...ampliar];\nconst texto = todo.map((j, i) =>\n  `[${i + 1}] (${j.carril === 'extra' ? 'EXTRA · ' : ''}${j.fuente}) ${j.titulo} — ${String(j.resumen).replace(/\\s+/g, ' ').slice(0, 300)}`\n).join('\\n');\n\nreturn [{ json: { items: todo, texto } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3264,
+        880
+      ],
+      "id": "e75328d8-e294-4659-acf8-924bee1a002e",
+      "name": "Puntuar y armar prompt"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI",
+          "cachedResultUrl": ""
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "={{ $json.texto }}"
+            },
+            {
+              "role": "system",
+              "content": "=Sos un filtro de noticias personalizado.\n\nPerfil de quien lee:\n{{ $('Configuración').first().json.perfil }}\n\nTe paso una lista numerada. Para CADA item devolvé un tipo y una frase.\n\nItems SIN la marca \"EXTRA ·\":\n- ACCION: afecta a las herramientas que usa (cambios, deprecaciones, precios, modelos nuevos, errores conocidos).\n- IDEA: un producto o automatización que podría armar u ofrecer según su perfil.\n- TENDENCIA: un cambio del mercado que le conviene conocer.\n- COMPETENCIA: alguien que ofrece algo parecido a lo que hace.\n- IRRELEVANTE: si tendrías que inventar la conexión con su perfil, es una pregunta de principiante, publicidad o un caso de éxito sin sustancia.\n\nItems CON la marca \"EXTRA ·\" (no necesitan relación directa con su trabajo):\n- IA: novedades de modelos, investigación y herramientas de IA.\n- CIENCIA_TECH: ciencia y tecnología que vale la pena conocer.\n- IDEA_FLUJO: una automatización concreta (disparador, pasos y resultado) que podría armar.\n- HERRAMIENTAS: técnicas o buenas prácticas de las herramientas que usa.\n- IRRELEVANTE: publicidad, pedidos de ayuda o algo sin sustancia.\n\nSi solo tenés el título y no se entiende de qué trata, marcalo IRRELEVANTE. No adivines.\n\n\"por_que\": una o dos frases en español que digan qué es y por qué vale la pena, usando solo lo que dice el texto. Vacío si es IRRELEVANTE.\nRespondé SOLO con JSON válido, con un elemento por cada item: {\"items\":[{\"n\":1,\"tipo\":\"ACCION\",\"por_que\":\"...\"}]}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        3472,
+        880
+      ],
+      "id": "969cacd6-834b-4e6c-bf78-3173049bdc9b",
+      "name": "Clasificar con IA",
+      "credentials": {
+        "openAiApi": {
+          "id": "MSwBX9CWPcMnJM75",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lee la respuesta de la IA, valida el JSON y arma la selección final.\nconst cfg = $('Configuración').first().json;\nconst lista = $('Puntuar y armar prompt').first().json.items;\nconst r = $input.first().json;\n\nlet texto = r.output?.[0]?.content?.[0]?.text ?? r.message?.content ?? r.text ?? r.output ?? '';\nif (typeof texto !== 'string') texto = JSON.stringify(texto);\ntexto = texto.replace(/```json|```/g, '').trim();\n\nlet arr = [];\ntry {\n  arr = JSON.parse(texto).items || [];\n} catch (e) {\n  // Si el modelo no devuelve JSON válido, no se rompe: se avisa por mail.\n  return [{ json: { error: 'El modelo no devolvió un JSON válido', crudo: texto.slice(0, 500) } }];\n}\n\nconst PRINCIPALES = ['ACCION', 'IDEA', 'TENDENCIA', 'COMPETENCIA'];\nconst EXTRAS = ['IA', 'CIENCIA_TECH', 'IDEA_FLUJO', 'HERRAMIENTAS'];\nconst MAX_PRINC = Number(cfg.max_principales) || 6;\nconst MAX_EXTRA = Number(cfg.max_extra) || 5;\nconst MAX_POR_FUENTE_EXTRA = 2;\n\nconst princ = [], extra = [], usados = new Set();\nfor (const s of arr) {\n  const j = lista[s.n - 1];\n  if (!j || usados.has(s.n)) continue;\n  usados.add(s.n);\n  const item = { ...j, tipo: s.tipo, por_que: s.por_que };\n  if (PRINCIPALES.includes(s.tipo)) princ.push(item);\n  else if (EXTRAS.includes(s.tipo)) extra.push(item);\n}\n\nprinc.sort((a, b) => (b.p || 0) - (a.p || 0) || Date.parse(b.fecha) - Date.parse(a.fecha));\nextra.sort((a, b) => Date.parse(b.fecha) - Date.parse(a.fecha));\n\nconst cuenta = {};\nconst extraFinal = extra.filter(j => (cuenta[j.fuente] = (cuenta[j.fuente] || 0) + 1) <= MAX_POR_FUENTE_EXTRA);\n\nconst final = [...princ.slice(0, MAX_PRINC), ...extraFinal.slice(0, MAX_EXTRA)];\nreturn final.length ? final.map(j => ({ json: j })) : [{ json: { vacio: true } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3792,
+        880
+      ],
+      "id": "9037ee61-ef15-46fe-9390-4c25460ba096",
+      "name": "Seleccionar resultados"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Arma el mail en HTML, agrupado por tipo de noticia.\nconst items = $input.all().map(i => i.json).filter(j => !j.vacio);\n\nif (items.length && items[0].error) {\n  return [{ json: {\n    subject: 'Resumen de novedades: falló la clasificación',\n    html: `<p>El modelo no devolvió un JSON válido.</p><pre>${String(items[0].crudo || '')}</pre>`\n  }}];\n}\n\nconst esc = s => String(s ?? '')\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;')\n  .replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\n\nconst fecha = new Date().toLocaleDateString('es-AR', {\n  timeZone: 'America/Argentina/Buenos_Aires',\n  day: '2-digit', month: '2-digit', year: 'numeric'\n});\n\nconst BLOQUES = [\n  { titulo: null, secciones: [\n    ['ACCION', 'Para revisar'],\n    ['IDEA', 'Ideas para armar o vender'],\n    ['TENDENCIA', 'Tendencias'],\n    ['COMPETENCIA', 'Competencia']\n  ]},\n  { titulo: 'Para ampliar', secciones: [\n    ['IA', 'IA'],\n    ['CIENCIA_TECH', 'Ciencia y tecnología'],\n    ['IDEA_FLUJO', 'Ideas de flujos'],\n    ['HERRAMIENTAS', 'Herramientas']\n  ]}\n];\n\nlet html = `<div style=\"font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#222\">`;\nhtml += `<h2 style=\"margin-bottom:4px\">Novedades del ${esc(fecha)}</h2>`;\n\nif (!items.length) {\n  html += `<p>Hoy no hubo novedades que valgan la pena.</p>`;\n} else {\n  for (const bloque of BLOQUES) {\n    const tipos = bloque.secciones.map(s => s[0]);\n    if (!items.some(j => tipos.includes(j.tipo))) continue;\n    if (bloque.titulo) {\n      html += `<h2 style=\"margin-top:36px;padding:8px 0;border-top:3px solid #0b57d0\">${esc(bloque.titulo)}</h2>`;\n    }\n    for (const [tipo, titulo] of bloque.secciones) {\n      const grupo = items.filter(j => j.tipo === tipo);\n      if (!grupo.length) continue;\n      html += `<h3 style=\"border-bottom:1px solid #ddd;padding-bottom:4px;margin-top:24px\">${esc(titulo)}</h3>`;\n      for (const j of grupo) {\n        html += `<p style=\"margin:12px 0\">`;\n        html += `<a href=\"${esc(j.link)}\" style=\"font-weight:bold;color:#0b57d0;text-decoration:none\">${esc(j.titulo)}</a><br>`;\n        html += `<span style=\"color:#666;font-size:12px\">${esc(j.fuente)}</span><br>`;\n        if (j.por_que) html += `<span>${esc(j.por_que)}</span>`;\n        html += `</p>`;\n      }\n    }\n  }\n}\nhtml += `</div>`;\n\nreturn [{ json: {\n  subject: `Novedades ${fecha}`,\n  html,\n  cantidad: items.length,\n  links: items.map(j => j.link)\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3984,
+        720
+      ],
+      "id": "6d174a5f-2552-4a69-b72f-20a954300d6d",
+      "name": "Armar el mail"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Configuración').first().json.destinatario }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        4208,
+        720
+      ],
+      "id": "88c5ccdc-2372-4731-9ee1-288611f5867e",
+      "name": "Enviar mail",
+      "webhookId": "70448fe4-8778-405e-97b1-70063bfc605f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "psAcjes3jbnKDiBj",
+          "name": "Gmail account 5"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Saca lo que ya se mandó en los últimos 7 días (según el historial en PostgreSQL).\nconst enviados = new Set(\n  $input.all().map(i => String(i.json.link || '').trim()).filter(Boolean)\n);\nconst nuevos = $('Filtrar recientes y duplicados').all()\n  .filter(i => i.json.link && !enviados.has(String(i.json.link).trim()));\nreturn nuevos.length ? nuevos : [{ json: { vacio: true } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2848,
+        736
+      ],
+      "id": "a1b1aeac-f542-4f7c-ad81-07f9bd5e2487",
+      "name": "Quitar ya enviados"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Registra todo lo que se evaluó: lo enviado y lo descartado,\n// para no volver a procesarlo en los próximos días.\nlet elegidos = [];\ntry { elegidos = $('Seleccionar resultados').all(); } catch (e) { return []; }\nif (elegidos[0]?.json.error) return [];\n\nconst evaluados = $('Puntuar y armar prompt').first().json.items;\nconst enviados = new Set(elegidos.map(i => i.json.link).filter(Boolean));\n\nreturn evaluados.map(j => ({ json: {\n  link: j.link,\n  titulo: j.titulo,\n  estado: enviados.has(j.link) ? 'enviado' : 'descartado'\n}}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4416,
+        720
+      ],
+      "id": "812ed073-b9ed-42e4-9eef-ac6cef6d1377",
+      "name": "Preparar historial"
+    },
+    {
+      "parameters": {
+        "url": "https://simonwillison.net/atom/everything/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        656
+      ],
+      "id": "d8961665-5fe1-4adb-b632-34d48a646de0",
+      "name": "Simon Willison",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://news.ycombinator.com/rss",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        512
+      ],
+      "id": "9547766c-3dc3-45af-ac18-a4109f75d7de",
+      "name": "Hacker News",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://huggingface.co/blog/feed.xml",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        368
+      ],
+      "id": "ce1c44f0-80e2-4509-80bb-093ab823b97b",
+      "name": "Hugging Face",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://www.technologyreview.com/feed/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        224
+      ],
+      "id": "3e60270f-e59f-4195-9bed-9b597af57ee1",
+      "name": "MIT Tech Review",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://api.quantamagazine.org/feed/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        -48
+      ],
+      "id": "3404e89b-2a3b-44e8-8a0a-180e76bef46c",
+      "name": "Quanta",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        80
+      ],
+      "id": "2a22b27b-a0fc-47f5-821d-b04b61eef336",
+      "name": "The Verge AI",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/automation/.rss",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        -192
+      ],
+      "id": "05f14c92-3998-4aca-90ab-8780eba3be2d",
+      "name": "Reddit automation",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "numberInputs": 7
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1328,
+        64
+      ],
+      "id": "e0c2f82f-4f09-41bd-8954-fa764f8cd99a",
+      "name": "Unir fuentes extra"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Marca las fuentes de interés general para que se clasifiquen aparte.\nconst FUENTES = ['Simon Willison', 'Hacker News', 'Hugging Face', 'MIT Tech Review', 'Quanta', 'The Verge AI', 'Reddit automation'];\nconst salida = [];\nfor (const nodo of FUENTES) {\n  let items = [];\n  try { items = $(nodo).all(); } catch (e) { continue; }\n  for (const it of items) {\n    if (it.json.error) continue;\n    salida.push({ json: { ...it.json, _fuente: nodo, _carril: 'extra' } });\n  }\n}\nreturn salida;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        336
+      ],
+      "id": "5f6af198-458a-4e72-825b-8632f24d6239",
+      "name": "Marcar fuentes extra"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1968,
+        736
+      ],
+      "id": "d5a6efee-24b3-4c8f-8c15-971e75f001cd",
+      "name": "Unir todo"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b3b706d2-8fee-4a55-88d6-d4e3e5a124d4",
+              "leftValue": "={{ $json.vacio === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3040,
+        736
+      ],
+      "id": "7f8703fc-bce9-4e6f-a5d0-25f84b64de10",
+      "name": "¿Sin novedades?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT link FROM novedades_vistas_demo\nWHERE visto_en > now() - interval '7 days';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2640,
+        736
+      ],
+      "id": "a397cdec-3a1c-4ce8-835f-6e76d9fd8815",
+      "name": "Leer historial",
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "rpw33KNaMdmm7g8t",
+          "name": "Postgres novedades noticias"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "novedades_vistas_demo",
+          "mode": "list",
+          "cachedResultName": "novedades_vistas_demo"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "link": "={{ $json.link }}",
+            "titulo": "={{ $json.titulo }}",
+            "estado": "={{ $json.estado }}"
+          },
+          "matchingColumns": [
+            "link"
+          ],
+          "schema": [
+            {
+              "id": "link",
+              "displayName": "link",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "titulo",
+              "displayName": "titulo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "visto_en",
+              "displayName": "visto_en",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        4624,
+        720
+      ],
+      "id": "2344c1b6-d8c4-4f7c-844b-d00dc678be5f",
+      "name": "Guardar en historial",
+      "credentials": {
+        "postgres": {
+          "id": "rpw33KNaMdmm7g8t",
+          "name": "Postgres novedades noticias"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d791290f-92e0-4dda-a7e2-1312c024865c",
+              "name": "destinatario",
+              "type": "string",
+              "value": "tu-email@ejemplo.com"
+            },
+            {
+              "id": "1eb8de5b-0f56-4722-b1ca-3fe24ca09ed5",
+              "name": "perfil",
+              "type": "string",
+              "value": "Trabajo en automatización con IA para pymes. Uso n8n, OpenAI, PostgreSQL y Google Sheets. Me interesan los cambios en esas herramientas, nuevas formas de usar agentes de IA y automatizaciones que se puedan vender a negocios chicos. No me interesan las finanzas personales ni los videojuegos."
+            },
+            {
+              "id": "ef630577-5ab6-47f2-9487-3e152f248c7d",
+              "name": "palabras_que_suman",
+              "type": "string",
+              "value": "agent, workflow, n8n, openai, claude, prompt, automation, whatsapp"
+            },
+            {
+              "id": "ec205aac-37f1-4322-9482-757f87015f92",
+              "name": "palabras_que_restan",
+              "type": "string",
+              "value": "crypto, gaming, seo"
+            },
+            {
+              "id": "3689d66b-c935-4b73-9769-4dd7bb833f66",
+              "name": "dias_hacia_atras",
+              "type": "number",
+              "value": 3
+            },
+            {
+              "id": "e99ce34d-6193-448d-8cd7-923e16f3837c",
+              "name": "max_principales",
+              "type": "number",
+              "value": 6
+            },
+            {
+              "id": "ae4aed85-7980-435b-916d-3d38261a2842",
+              "name": "max_extra",
+              "type": "number",
+              "value": 5
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -336,
+        736
+      ],
+      "id": "dc812cfe-aeea-49f0-989f-7b4b900d8087",
+      "name": "Configuración"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Todos los días 8 AM": {
+      "main": [
+        [
+          {
+            "node": "Configuración",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuración": {
+      "main": [
+        [
+          {
+            "node": "Claude Code releases",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "n8n releases",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "n8n blog",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "n8n foro",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "OpenAI news",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google AI blog",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Product Hunt",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Reddit automation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Quanta",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "The Verge AI",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MIT Tech Review",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Hugging Face",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Hacker News",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Simon Willison",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Code releases": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes principales",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n8n releases": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes principales",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "n8n blog": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes principales",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "n8n foro": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes principales",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "OpenAI news": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes principales",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Google AI blog": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes principales",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Product Hunt": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes principales",
+            "type": "main",
+            "index": 6
+          }
+        ]
+      ]
+    },
+    "Reddit automation": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes extra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quanta": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes extra",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "The Verge AI": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes extra",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "MIT Tech Review": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes extra",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Hugging Face": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes extra",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Hacker News": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes extra",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Simon Willison": {
+      "main": [
+        [
+          {
+            "node": "Unir fuentes extra",
+            "type": "main",
+            "index": 6
+          }
+        ]
+      ]
+    },
+    "Unir fuentes extra": {
+      "main": [
+        [
+          {
+            "node": "Marcar fuentes extra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar fuentes extra": {
+      "main": [
+        [
+          {
+            "node": "Unir todo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unir fuentes principales": {
+      "main": [
+        [
+          {
+            "node": "Unir todo",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Unir todo": {
+      "main": [
+        [
+          {
+            "node": "Normalizar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar": {
+      "main": [
+        [
+          {
+            "node": "Filtrar recientes y duplicados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar recientes y duplicados": {
+      "main": [
+        [
+          {
+            "node": "Leer historial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer historial": {
+      "main": [
+        [
+          {
+            "node": "Quitar ya enviados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quitar ya enviados": {
+      "main": [
+        [
+          {
+            "node": "¿Sin novedades?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Sin novedades?": {
+      "main": [
+        [
+          {
+            "node": "Armar el mail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Puntuar y armar prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Puntuar y armar prompt": {
+      "main": [
+        [
+          {
+            "node": "Clasificar con IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar con IA": {
+      "main": [
+        [
+          {
+            "node": "Seleccionar resultados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seleccionar resultados": {
+      "main": [
+        [
+          {
+            "node": "Armar el mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar el mail": {
+      "main": [
+        [
+          {
+            "node": "Enviar mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar mail": {
+      "main": [
+        [
+          {
+            "node": "Preparar historial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar historial": {
+      "main": [
+        [
+          {
+            "node": "Guardar en historial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3d54142d-9e34-43fe-8f95-df3f921789a7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7269cd5a016f61a84678726a2952adb933e0b209f26fd92b46dcf8ef0a312289"
+  },
+  "nodeGroups": [],
+  "id": "8ZXo97rP1IFYelcN",
+  "tags": []
+}
