@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/34241665/README.md)
 # Resumen diario de novedades con IA
 
 Workflow de **n8n** que todas las mañanas lee 14 fuentes de noticias, descarta lo repetido y lo irrelevante, usa IA para clasificar lo que queda según un perfil de intereses y manda un resumen por mail.
